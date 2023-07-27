@@ -2,14 +2,14 @@
 
 ## lean engine composition
 
-The relationship bot is made of a set o small parts that fulfill (or aim to fulfill) 80% of use cases with 20% of effort (Pareto rule). For that, it is assembled a lean engine, which is the heart of the system. It is composable of:
+The relationship bot is made of a set of small parts that fulfill (or aim to fulfill) 80% of use cases with 20% of effort (Pareto rule). For that, it is assembled a lean engine, which is the heart of the system. It is composable of:
 
 - User Input (User messages sent to the bot)
 - Lean Engine (The system which we are going to develop)
 - Bot Output (Messages sent to the user by the bot)
 - Feedback mechanism of learning (inputs and outputs are fed into the system to be saved in a vector DB, which the bot remembers over time)
 
-This is the lean engine. The smallest set of possible parts. The final system can have integration with other systems, posess more complex functionalities but by maintaining a small core, we can achieve a great level of understanding of the problem and componentization. 
+This is the lean engine. The smallest possible set of parts. The final system can have integration with other systems and posess more complex functionalities, but by maintaining a small core, we can achieve a great level of understanding of the problem and componentization. 
 
 ### parts
 
