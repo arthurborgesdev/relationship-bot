@@ -4,8 +4,7 @@ import (
 	"log"
 	"os"
 
-	"relationship-bot/vectordb"
-
+	"github.com/arthurborgesdev/relationship-bot/vectordb"
 	"github.com/gofiber/fiber/v2"
 	"github.com/joho/godotenv"
 
