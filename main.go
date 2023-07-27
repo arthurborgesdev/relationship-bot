@@ -77,6 +77,64 @@ func embed(message string, llmClient *openai.Client) ([]float32, error) {
 	return resp.Data[0].Embedding, nil
 }
 
+func insertVector(llmClient *openai.Client, milvusClient client.Client, c *fiber.Ctx, message, user string) error {
+	vector, err := embed(message, llmClient)
+	if err != nil {
+		fmt.Printf("Embedding error: %v\n", err)
+		return err
+	}
+
+	messageColumn := entity.NewColumnVarChar("message", []string{message})
+	senderColumn := entity.NewColumnVarChar("sender", []string{user})
+	messageVectorColumn := entity.NewColumnFloatVector("message_vector", 1536, [][]float32{vector})
+
+	_, err = milvusClient.Insert(
+		context.Background(), // ctx
+		"messages",           // CollectionName
+		"",                   // partitionName
+		messageColumn,        // columnarData
+		senderColumn,         // columnarData
+		messageVectorColumn,  // columnarData
+	)
+	if err != nil {
+		log.Println("failed to insert data:", err.Error())
+		return c.Status(fiber.StatusInternalServerError).SendString(err.Error())
+	}
+
+	idx, err := entity.NewIndexIvfFlat(
+		entity.L2,
+		1024,
+	)
+	if err != nil {
+		log.Fatal("fail to create ivf flat index parameter:", err.Error())
+		return err
+	}
+
+	err = milvusClient.CreateIndex(
+		context.Background(),
+		"messages",
+		"message_vector",
+		idx,
+		false,
+	)
+	if err != nil {
+		log.Fatal("fail to create index:", err.Error())
+		return err
+	}
+
+	err = milvusClient.LoadCollection(
+		context.Background(),
+		"messages",
+		false,
+	)
+	if err != nil {
+		log.Println("Failed to load collection:", err.Error())
+		return err
+	}
+
+	return nil
+}
+
 func main() {
 	err := godotenv.Load()
 	if err != nil {
@@ -247,6 +305,12 @@ func main() {
 	})
 
 	app.Post("/messages", func(c *fiber.Ctx) error {
+		message := new(Message)
+
+		if err := c.BodyParser(message); err != nil {
+			return c.Status(fiber.StatusBadRequest).SendString(err.Error())
+		}
+
 		resp, err := llmClient.CreateChatCompletion(
 			context.Background(),
 			openai.ChatCompletionRequest{
@@ -254,7 +318,7 @@ func main() {
 				Messages: []openai.ChatCompletionMessage{
 					{
 						Role:    openai.ChatMessageRoleUser,
-						Content: "Hello!",
+						Content: message.MessageText,
 					},
 				},
 			},
@@ -264,9 +328,89 @@ func main() {
 			return c.SendString(err.Error())
 		}
 
+		err = insertVector(llmClient, milvusClient, c, message.MessageText, "user")
+		if err != nil {
+			fmt.Printf("Insert user message error in Vector DB: %v\n", err)
+			return c.SendString(err.Error())
+		}
+
+		err = insertVector(llmClient, milvusClient, c, resp.Choices[0].Message.Content, "llm")
+		if err != nil {
+			fmt.Printf("Insert llm message error in Vector DB: %v\n", err)
+			return c.SendString(err.Error())
+		}
+
 		fmt.Println(resp.Choices[0].Message.Content)
 
 		return c.SendString(resp.Choices[0].Message.Content)
+	})
+
+	app.Get("/messages", func(c *fiber.Ctx) error {
+		message := new(Message)
+		if err := c.BodyParser(message); err != nil {
+			return c.Status(fiber.StatusBadRequest).SendString(err.Error())
+		}
+
+		err = milvusClient.LoadCollection(
+			context.Background(),
+			"messages",
+			false,
+		)
+		if err != nil {
+			log.Println("Failed to load collection:", err.Error())
+			return c.SendString(err.Error())
+		}
+
+		sp, _ := entity.NewIndexIvfFlatSearchParam( // NewIndex*SearchParam func
+			10, // searchParam
+		)
+
+		opt := client.SearchQueryOptionFunc(func(option *client.SearchQueryOption) {
+			option.Limit = 3
+			option.Offset = 0
+			option.ConsistencyLevel = entity.ClStrong
+			option.IgnoreGrowing = false
+		})
+
+		vector, err := embed(message.MessageText, llmClient)
+		if err != nil {
+			fmt.Printf("Embedding error: %v\n", err)
+			return err
+		}
+
+		searchResult, err := milvusClient.Search(
+			context.Background(), // ctx
+			"messages",           // CollectionName
+			[]string{},           // partitionNames
+			"",                   // expr
+			[]string{"message"},  // outputFields
+			[]entity.Vector{entity.FloatVector(vector)}, // vectors
+			"message_vector", // vectorField
+			entity.L2,        // metricType
+			10,               // topK
+			sp,               // sp
+			opt,
+		)
+		if err != nil {
+			log.Fatal("fail to search collection:", err.Error())
+		}
+
+		fmt.Printf("%#v\n", searchResult)
+
+		for _, sr := range searchResult {
+			fmt.Println(sr.IDs)
+			fmt.Println(sr.Scores)
+		}
+
+		err = milvusClient.ReleaseCollection(
+			context.Background(), // ctx
+			"messages",           // CollectionName
+		)
+		if err != nil {
+			log.Fatal("failed to release collection:", err.Error())
+		}
+
+		return c.SendString("Collection loaded in memory!")
 	})
 
 	app.Listen(":3000")
