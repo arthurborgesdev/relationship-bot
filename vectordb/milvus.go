@@ -80,6 +80,36 @@ func embed(message string, llmClient *openai.Client) ([]float32, error) {
 	return resp.Data[0].Embedding, nil
 }
 
+func (s *MilvusService) RegisterRoutes(router fiber.Router) {
+	router.Post("/messages", s.insertMessage)
+	router.Get("/messages", s.vectorSearch)
+	router.Post("/vectors", s.insertVector)
+	router.Post("/embeddings", s.createEmbeddings)
+	router.Delete("/collections/:name", s.deleteCollection)
+	router.Get("/collections", s.listCollections)
+	router.Get("/collections/:name", s.showCollection)
+	router.Post("/collections", s.createCollection)
+}
+
+func New(llmClient *openai.Client) (*MilvusService, error) {
+	err := godotenv.Load()
+	if err != nil {
+		log.Fatal("Error loading .env file")
+	}
+	milvusClient, err := client.NewClient(context.Background(), client.Config{
+		Address: "localhost:19530",
+	})
+	if err != nil {
+		fmt.Printf("Can't connect to Milvus: %v\n", err)
+		return nil, err
+	}
+
+	return &MilvusService{
+		llmClient:    llmClient,
+		milvusClient: milvusClient,
+	}, nil
+}
+
 func insertVector(llmClient *openai.Client, milvusClient client.Client, c *fiber.Ctx, message, user string) error {
 	vector, err := embed(message, llmClient)
 	if err != nil {
@@ -138,25 +168,6 @@ func insertVector(llmClient *openai.Client, milvusClient client.Client, c *fiber
 	return nil
 }
 
-func New(llmClient *openai.Client) (*MilvusService, error) {
-	err := godotenv.Load()
-	if err != nil {
-		log.Fatal("Error loading .env file")
-	}
-	milvusClient, err := client.NewClient(context.Background(), client.Config{
-		Address: "localhost:19530",
-	})
-	if err != nil {
-		fmt.Printf("Can't connect to Milvus: %v\n", err)
-		return nil, err
-	}
-
-	return &MilvusService{
-		llmClient:    llmClient,
-		milvusClient: milvusClient,
-	}, nil
-}
-
 func (s *MilvusService) createCollection(c *fiber.Ctx) error {
 	err := s.milvusClient.CreateCollection(
 		context.Background(), // ctx
@@ -169,17 +180,6 @@ func (s *MilvusService) createCollection(c *fiber.Ctx) error {
 	}
 
 	return c.SendString("Collection Created!")
-}
-
-func (s *MilvusService) RegisterRoutes(router fiber.Router) {
-	router.Post("/messages", s.insertMessage)
-	router.Get("/messages", s.vectorSearch)
-	router.Post("/vectors", s.insertVector)
-	router.Post("/embeddings", s.createEmbeddings)
-	router.Delete("/collections/:name", s.deleteCollection)
-	router.Get("/collections", s.listCollections)
-	router.Get("/collections/:name", s.showCollection)
-	router.Post("/collections", s.createCollection)
 }
 
 func (s *MilvusService) showCollection(c *fiber.Ctx) error {
