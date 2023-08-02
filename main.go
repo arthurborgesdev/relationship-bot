@@ -6,6 +6,10 @@ import (
 	"log"
 	"os"
 
+	"github.com/sashabaranov/go-openai/jsonschema"
+
+	"encoding/json"
+
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 
@@ -21,17 +25,21 @@ type Message struct {
 	Role    string `json:"role"`
 }
 
-type LlmMessage struct {
+type LLMMessage struct {
 	Role    string `json:"role"`
 	Content string `json:"content"`
 }
 
-type LlmService struct {
+type LLMService struct {
 	llmClient *openai.Client
 	db        *gorm.DB
 }
 
-func getMessages(s *LlmService) ([]LlmMessage, error) {
+type Arguments struct {
+	Date string `json:"date"`
+}
+
+func getMessages(s *LLMService) ([]LLMMessage, error) {
 	var messages []Message
 	result := s.db.Find(&messages)
 
@@ -41,21 +49,21 @@ func getMessages(s *LlmService) ([]LlmMessage, error) {
 
 	fmt.Println(result)
 
-	var LlmMessages []LlmMessage
+	var LLMMessages []LLMMessage
 	for _, message := range messages {
-		LlmMessages = append(LlmMessages, LlmMessage{Role: message.Role, Content: message.Content})
+		LLMMessages = append(LLMMessages, LLMMessage{Role: message.Role, Content: message.Content})
 	}
 
-	return LlmMessages, nil
+	return LLMMessages, nil
 }
 
-func (s *LlmService) RegisterRoutes(router fiber.Router) {
+func (s *LLMService) RegisterRoutes(router fiber.Router) {
 	router.Post("/messagesdb", s.insertMessageRelational)
 	router.Get("/messagesdb", s.getMessagesRelational)
 	router.Post("/messages", s.chat)
 }
 
-func New(db *gorm.DB) (*LlmService, error) {
+func New(db *gorm.DB) (*LLMService, error) {
 	err := godotenv.Load()
 	if err != nil {
 		log.Fatal("Error loading .env file")
@@ -63,13 +71,60 @@ func New(db *gorm.DB) (*LlmService, error) {
 
 	llmClient := openai.NewClient(os.Getenv("OPENAI_AUTH_TOKEN"))
 
-	return &LlmService{
+	return &LLMService{
 		db:        db,
 		llmClient: llmClient,
 	}, nil
 }
 
-func (s *LlmService) chat(c *fiber.Ctx) error {
+func (s *LLMService) insertMessageRelational(c *fiber.Ctx) error {
+	message := new(Message)
+
+	if err := c.BodyParser(message); err != nil {
+		return c.Status(fiber.StatusBadRequest).SendString(err.Error())
+	}
+
+	resp, err := s.llmClient.CreateChatCompletion(
+		context.Background(),
+		openai.ChatCompletionRequest{
+			Model: os.Getenv("OPENAI_MODEL_ID"),
+			Messages: []openai.ChatCompletionMessage{
+				{
+					Role:    openai.ChatMessageRoleUser,
+					Content: message.Content,
+				},
+			},
+		},
+	)
+	if err != nil {
+		fmt.Printf("ChatCompletion error: %v\n", err)
+		return c.SendString(err.Error())
+	}
+
+	s.db.Create(&Message{Content: message.Content, Role: openai.ChatMessageRoleUser})
+	s.db.Create(&Message{Content: resp.Choices[0].Message.Content, Role: openai.ChatMessageRoleAssistant})
+
+	fmt.Println(resp.Choices[0].Message.Content)
+
+	return c.SendString(resp.Choices[0].Message.Content)
+}
+
+func (s *LLMService) getMessagesRelational(c *fiber.Ctx) error {
+	var messages []Message
+	result := s.db.Find(&messages)
+
+	if result.Error != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": result.Error,
+		})
+	}
+
+	fmt.Println(result)
+
+	return c.JSON(messages)
+}
+
+func (s *LLMService) chat(c *fiber.Ctx) error {
 	message := new(Message)
 
 	if err := c.BodyParser(message); err != nil {
@@ -115,8 +170,9 @@ func (s *LlmService) chat(c *fiber.Ctx) error {
 	resp, err := s.llmClient.CreateChatCompletion(
 		context.Background(),
 		openai.ChatCompletionRequest{
-			Model:    os.Getenv("OPENAI_MODEL_ID"),
-			Messages: chatHistory,
+			Model:     os.Getenv("OPENAI_MODEL_ID"),
+			Messages:  chatHistory,
+			Functions: []openai.FunctionDefinition{ChatFunction},
 		},
 	)
 	if err != nil {
@@ -124,59 +180,35 @@ func (s *LlmService) chat(c *fiber.Ctx) error {
 		return c.SendString(err.Error())
 	}
 
+	var arguments Arguments
+
+	json.Unmarshal([]byte(resp.Choices[0].Message.FunctionCall.Arguments), &arguments)
+	fmt.Println(arguments.Date)
+
 	s.db.Create(&Message{Content: message.Content, Role: openai.ChatMessageRoleUser})
 	s.db.Create(&Message{Content: resp.Choices[0].Message.Content, Role: openai.ChatMessageRoleAssistant})
 
-	fmt.Println(resp.Choices[0].Message.Content)
+	fmt.Println(resp.Choices[0].Message.FunctionCall.Arguments)
 
-	return c.SendString(resp.Choices[0].Message.Content)
+	return c.SendString(resp.Choices[0].Message.FunctionCall.Arguments)
 }
 
-func (s *LlmService) insertMessageRelational(c *fiber.Ctx) error {
-	message := new(Message)
-
-	if err := c.BodyParser(message); err != nil {
-		return c.Status(fiber.StatusBadRequest).SendString(err.Error())
-	}
-
-	resp, err := s.llmClient.CreateChatCompletion(
-		context.Background(),
-		openai.ChatCompletionRequest{
-			Model: os.Getenv("OPENAI_MODEL_ID"),
-			Messages: []openai.ChatCompletionMessage{
-				{
-					Role:    openai.ChatMessageRoleUser,
-					Content: message.Content,
-				},
+var ChatFunction = openai.FunctionDefinition{
+	Name:        "setScheduleDate",
+	Description: "Set the schedule date for the user",
+	Parameters: jsonschema.Definition{
+		Type: "object",
+		Properties: map[string]jsonschema.Definition{
+			"date": {
+				Type: "string",
+				Description: `O usuário poderá informar a data que ele deseja agendar a consulta. Ele pode
+				informar somente o dia, ou a hora, ou o dia da semana, ou dois ou três desses dados ao mesmo tempo
+				em vários formatos diferentes, por extenso ou em numeral. Exemplos: "segunda-feira", "segunda", "seg".
+				Pegue esses dados e armazene inicialemtne`,
 			},
 		},
-	)
-	if err != nil {
-		fmt.Printf("ChatCompletion error: %v\n", err)
-		return c.SendString(err.Error())
-	}
-
-	s.db.Create(&Message{Content: message.Content, Role: openai.ChatMessageRoleUser})
-	s.db.Create(&Message{Content: resp.Choices[0].Message.Content, Role: openai.ChatMessageRoleAssistant})
-
-	fmt.Println(resp.Choices[0].Message.Content)
-
-	return c.SendString(resp.Choices[0].Message.Content)
-}
-
-func (s *LlmService) getMessagesRelational(c *fiber.Ctx) error {
-	var messages []Message
-	result := s.db.Find(&messages)
-
-	if result.Error != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": result.Error,
-		})
-	}
-
-	fmt.Println(result)
-
-	return c.JSON(messages)
+		Required: []string{"date"},
+	},
 }
 
 func main() {
