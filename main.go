@@ -13,6 +13,8 @@ import (
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 
+	"strings"
+
 	"github.com/gofiber/fiber/v2"
 	"github.com/joho/godotenv"
 
@@ -23,6 +25,13 @@ type Message struct {
 	gorm.Model
 	Content string `json:"content"`
 	Role    string `json:"role"`
+}
+
+type Products struct {
+	gorm.Model
+	Product  string `json:"product"`
+	Flavor   string `json:"flavor"`
+	Quantity int    `json:"quantity"`
 }
 
 type LLMMessage struct {
@@ -36,7 +45,10 @@ type LLMService struct {
 }
 
 type Arguments struct {
-	Date string `json:"date"`
+	Date     string `json:"date"`
+	Product  string `json:"product"`
+	Flavor   string `json:"flavor"`
+	Quantity string `json:"quantity"`
 }
 
 func getMessages(s *LLMService) ([]LLMMessage, error) {
@@ -59,6 +71,9 @@ func getMessages(s *LLMService) ([]LLMMessage, error) {
 
 func (s *LLMService) RegisterRoutes(router fiber.Router) {
 	router.Post("/messagesdb", s.insertMessageRelational)
+	router.Post("/productsdb", s.insertProductsRelational)
+	router.Get("/productsdb", s.getProductsRelational)
+	router.Delete("/productsdb/:id", s.deleteProduct)
 	router.Get("/messagesdb", s.getMessagesRelational)
 	router.Post("/messages", s.chat)
 }
@@ -148,6 +163,18 @@ func (s *LLMService) insertMessageRelational(c *fiber.Ctx) error {
 	return c.SendString(resp.Choices[0].Message.Content)
 }
 
+func (s *LLMService) insertProductsRelational(c *fiber.Ctx) error {
+	product := new(Products)
+
+	if err := c.BodyParser(product); err != nil {
+		return c.Status(fiber.StatusBadRequest).SendString(err.Error())
+	}
+
+	s.db.Create(&Products{Product: strings.ToLower(product.Product), Flavor: strings.ToLower(product.Flavor), Quantity: product.Quantity})
+
+	return c.SendString("Produto salvo com sucesso!")
+}
+
 func (s *LLMService) getMessagesRelational(c *fiber.Ctx) error {
 	var messages []Message
 	result := s.db.Find(&messages)
@@ -161,6 +188,40 @@ func (s *LLMService) getMessagesRelational(c *fiber.Ctx) error {
 	fmt.Println(result)
 
 	return c.JSON(messages)
+}
+
+func (s *LLMService) getProductsRelational(c *fiber.Ctx) error {
+	var products []Products
+	result := s.db.Find(&products)
+
+	if result.Error != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": result.Error,
+		})
+	}
+
+	fmt.Println(result)
+
+	return c.JSON(products)
+}
+
+func (s *LLMService) deleteProduct(c *fiber.Ctx) error {
+	id := c.Params("id")
+	result := s.db.Unscoped().Delete(&Products{}, id)
+
+	if result.Error != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": result.Error,
+		})
+	}
+
+	if result.RowsAffected > 0 {
+		fmt.Println("Record deleted successfully.")
+		return c.SendString("Record deleted successfully.")
+	} else {
+		fmt.Println("No record found with the provided ID.")
+		return c.SendString("No record found with the provided ID.")
+	}
 }
 
 func (s *LLMService) chat(c *fiber.Ctx) error {
@@ -206,15 +267,24 @@ func (s *LLMService) chat(c *fiber.Ctx) error {
 		incommingArguments = resp.Choices[0].Message.Content
 	}
 
-	json.Unmarshal([]byte(incommingArguments), &arguments)
-	fmt.Println(arguments.Date)
-
+	// Save entries in Message DB to build a history -> Useful for medical scenario (not vape)
 	s.db.Create(&Message{Content: message.Content, Role: openai.ChatMessageRoleUser})
 	s.db.Create(&Message{Content: incommingArguments, Role: openai.ChatMessageRoleAssistant})
 
-	fmt.Println(incommingArguments)
+	json.Unmarshal([]byte(incommingArguments), &arguments)
 
-	return c.SendString(incommingArguments)
+	var product Products
+	result := s.db.Where("product = ? OR flavor = ? OR quantity = ?", arguments.Product, arguments.Flavor, arguments.Quantity).First(&product)
+
+	if result.Error != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": result.Error,
+		})
+	}
+
+	fmt.Println(result)
+
+	return c.JSON(result)
 }
 
 var getDateTime = openai.FunctionDefinition{
@@ -253,7 +323,7 @@ var getProductsList = openai.FunctionDefinition{
 				de pods. Exemplo: "Freebase de morango", "Nicsalt de uva". Salve apenas os sabores separados por vírgula`,
 			},
 			"quantity": {
-				Type: "string",
+				Type: "integer",
 				Description: `O usuário informará a quantidade de vapes e pods que ele quer comprar. Ele pode informar diferentes quantidades,
 				para cada item diferente. Exemplos: "2 Freebase de morango", "3 vapes de menta". Retorne apenas a quantidade separada por vírgula`,
 			},
@@ -269,6 +339,11 @@ func main() {
 	}
 
 	err = db.AutoMigrate(&Message{})
+	if err != nil {
+		log.Fatalf("failed to migrate database: %v", err)
+	}
+
+	err = db.AutoMigrate(&Products{})
 	if err != nil {
 		log.Fatalf("failed to migrate database: %v", err)
 	}
