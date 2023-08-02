@@ -77,6 +77,45 @@ func New(db *gorm.DB) (*LLMService, error) {
 	}, nil
 }
 
+func chatHistory(c *fiber.Ctx, s *LLMService, message *Message) ([]openai.ChatCompletionMessage, error) {
+	previousChat, err := getMessages(s)
+	if err != nil {
+		fmt.Printf("Get previous chat error: %v\n", err)
+		return nil, err
+	}
+
+	// Convert previousChat to a slice of openai.ChatCompletionMessage
+	var chatHistory []openai.ChatCompletionMessage
+	for _, chatMessage := range previousChat {
+		chatHistory = append(chatHistory, openai.ChatCompletionMessage{
+			Role:    chatMessage.Role,
+			Content: chatMessage.Content,
+		})
+	}
+
+	// Append the user's new message to chatHistory
+	chatHistory = append(chatHistory, openai.ChatCompletionMessage{
+		Role:    openai.ChatMessageRoleUser,
+		Content: message.Content,
+	})
+
+	// Include the system message at the beginning
+	systemMessage := openai.ChatCompletionMessage{
+		Role: openai.ChatMessageRoleSystem,
+		Content: `Você é um chatbot que auxilia profissionais liberais a agendarem suas consultas,
+		devendo responder prontamente e com polidez e ânimo a perguntas sobre o serviço prestado. Responda
+		com respostas concisas, curtas e objetivas. As pessoas irão fazer perguntas sobre serviços de medicina,
+		odontologia e nutrição. Responda com respostas curtas e objetivas. Para perguntas que fujam do escopo
+		mencionado, apenas responda com polidez dizendo que não está apto a responder perguntas de áreas que não
+		sejam medicina, odontologia e nutrição.`,
+	}
+
+	// Add system message at the beginning of the chat
+	chatHistory = append([]openai.ChatCompletionMessage{systemMessage}, chatHistory...)
+
+	return chatHistory, nil
+}
+
 func (s *LLMService) insertMessageRelational(c *fiber.Ctx) error {
 	message := new(Message)
 
@@ -132,47 +171,24 @@ func (s *LLMService) chat(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).SendString(err.Error())
 	}
 
-	previousChat, err := getMessages(s)
-	if err != nil {
-		fmt.Printf("Get previous chat error: %v\n", err)
-		return c.Status(fiber.StatusInternalServerError).SendString(err.Error())
-	}
+	// chatHistory, err := chatHistory(c, s, message)
+	// if err != nil {
+	// 	fmt.Printf("chatHistory fetching resulted in error: %v", err)
+	// 	c.Status(fiber.StatusInternalServerError).SendString(err.Error())
+	// }
 
-	// Convert previousChat to a slice of openai.ChatCompletionMessage
-	var chatHistory []openai.ChatCompletionMessage
-	for _, chatMessage := range previousChat {
-		chatHistory = append(chatHistory, openai.ChatCompletionMessage{
-			Role:    chatMessage.Role,
-			Content: chatMessage.Content,
-		})
-	}
-
-	// Append the user's new message to chatHistory
-	chatHistory = append(chatHistory, openai.ChatCompletionMessage{
+	var messages []openai.ChatCompletionMessage
+	chatMessage := append(messages, openai.ChatCompletionMessage{
 		Role:    openai.ChatMessageRoleUser,
 		Content: message.Content,
 	})
-
-	// Include the system message at the beginning
-	systemMessage := openai.ChatCompletionMessage{
-		Role: openai.ChatMessageRoleSystem,
-		Content: `Você é um chatbot que auxilia profissionais liberais a agendarem suas consultas,
-		devendo responder prontamente e com polidez e ânimo a perguntas sobre o serviço prestado. Responda
-		com respostas concisas, curtas e objetivas. As pessoas irão fazer perguntas sobre serviços de medicina,
-		odontologia e nutrição. Responda com respostas curtas e objetivas. Para perguntas que fujam do escopo
-		mencionado, apenas responda com polidez dizendo que não está apto a responder perguntas de áreas que não
-		sejam medicina, odontologia e nutrição.`,
-	}
-
-	// Add system message at the beginning of the chat
-	chatHistory = append([]openai.ChatCompletionMessage{systemMessage}, chatHistory...)
 
 	resp, err := s.llmClient.CreateChatCompletion(
 		context.Background(),
 		openai.ChatCompletionRequest{
 			Model:     os.Getenv("OPENAI_MODEL_ID"),
-			Messages:  chatHistory,
-			Functions: []openai.FunctionDefinition{ChatFunction},
+			Messages:  chatMessage,
+			Functions: []openai.FunctionDefinition{getDateTime, getProductsList},
 		},
 	)
 	if err != nil {
@@ -182,18 +198,26 @@ func (s *LLMService) chat(c *fiber.Ctx) error {
 
 	var arguments Arguments
 
-	json.Unmarshal([]byte(resp.Choices[0].Message.FunctionCall.Arguments), &arguments)
+	incommingArguments := ""
+
+	if resp.Choices[0].Message.Content == "" {
+		incommingArguments = resp.Choices[0].Message.FunctionCall.Arguments
+	} else {
+		incommingArguments = resp.Choices[0].Message.Content
+	}
+
+	json.Unmarshal([]byte(incommingArguments), &arguments)
 	fmt.Println(arguments.Date)
 
 	s.db.Create(&Message{Content: message.Content, Role: openai.ChatMessageRoleUser})
-	s.db.Create(&Message{Content: resp.Choices[0].Message.Content, Role: openai.ChatMessageRoleAssistant})
+	s.db.Create(&Message{Content: incommingArguments, Role: openai.ChatMessageRoleAssistant})
 
-	fmt.Println(resp.Choices[0].Message.FunctionCall.Arguments)
+	fmt.Println(incommingArguments)
 
-	return c.SendString(resp.Choices[0].Message.FunctionCall.Arguments)
+	return c.SendString(incommingArguments)
 }
 
-var ChatFunction = openai.FunctionDefinition{
+var getDateTime = openai.FunctionDefinition{
 	Name:        "setScheduleDate",
 	Description: "Set the schedule date for the user",
 	Parameters: jsonschema.Definition{
@@ -208,6 +232,33 @@ var ChatFunction = openai.FunctionDefinition{
 			},
 		},
 		Required: []string{"date"},
+	},
+}
+
+var getProductsList = openai.FunctionDefinition{
+	Name:        "getProductsList",
+	Description: "Get products from user based on his queries",
+	Parameters: jsonschema.Definition{
+		Type: "object",
+		Properties: map[string]jsonschema.Definition{
+			"product": {
+				Type: "string",
+				Description: `O usuário informará a lista de vapes e pods que ele quer comprar. Ele pode informar a marca, o modelo,
+				a quantidade, o sabor e outros dados referentes a produtos de cigarros eletônicos. Exemplos: "Freebase", "Menta".
+				Salve esses produtos separados por vírgula`,
+			},
+			"flavor": {
+				Type: "string",
+				Description: `O usuário informará os sabores de juices que ele quer comprar. Aqui os sabores podem ser tanto de vapes quanto
+				de pods. Exemplo: "Freebase de morango", "Nicsalt de uva". Salve apenas os sabores separados por vírgula`,
+			},
+			"quantity": {
+				Type: "string",
+				Description: `O usuário informará a quantidade de vapes e pods que ele quer comprar. Ele pode informar diferentes quantidades,
+				para cada item diferente. Exemplos: "2 Freebase de morango", "3 vapes de menta". Retorne apenas a quantidade separada por vírgula`,
+			},
+		},
+		Required: []string{"product", "flavor", "quantity"},
 	},
 }
 
