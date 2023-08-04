@@ -10,6 +10,7 @@ import (
 	"golang.org/x/oauth2/google"
 	"google.golang.org/api/calendar/v3"
 	"google.golang.org/api/option"
+	"google.golang.org/api/tasks/v1"
 )
 
 func googleCalendar() {
@@ -19,7 +20,7 @@ func googleCalendar() {
 		log.Fatalf("unable to read json key file: %v", err)
 	}
 
-	creds, err := google.CredentialsFromJSON(context.Background(), jsonKey, calendar.CalendarScope)
+	creds, err := google.CredentialsFromJSON(context.Background(), jsonKey, calendar.CalendarScope, tasks.TasksScope)
 	if err != nil {
 		log.Fatalf("unable to parse client secret file to config: %v", err)
 	}
@@ -48,6 +49,39 @@ func googleCalendar() {
 			}
 			fmt.Printf("%v (%v)\n", item.Summary, date)
 		}
+	}
+
+	tasksService, err := tasks.NewService(ctx, option.WithCredentials(creds))
+	if err != nil {
+		log.Fatalf("Unable to retrieve Tasks client: %v", err)
+	}
+
+	taskLists, err := tasksService.Tasklists.List().Do()
+	if err != nil {
+		log.Fatalf("Unable to retrieve task lists: %v", err)
+	}
+
+	if len(taskLists.Items) == 0 {
+		fmt.Println("No task lists found.")
+		return
+	}
+	fmt.Println("Task lists:")
+	for _, item := range taskLists.Items {
+		fmt.Printf("%v (%v)\n", item.Title, item.Id)
+	}
+
+	tasks, err := tasksService.Tasks.List(taskLists.Items[0].Id).Do()
+	if err != nil {
+		log.Fatalf("Unable to retrieve tasks: %v", err)
+	}
+
+	if len(tasks.Items) == 0 {
+		fmt.Println("No tasks found.")
+		return
+	}
+	fmt.Println("Tasks:")
+	for _, item := range tasks.Items {
+		fmt.Printf("%v (%v)\n", item.Title, item.Id)
 	}
 
 	event := &calendar.Event{
