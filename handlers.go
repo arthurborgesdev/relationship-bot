@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/gofiber/fiber/v2"
 	openai "github.com/sashabaranov/go-openai"
@@ -20,6 +21,10 @@ func (s *LLMService) RegisterRoutes(router fiber.Router) {
 
 	router.Delete("/productsdb/:id", s.deleteProduct)
 }
+
+var weekday time.Weekday
+var weekdayStr string
+var date string
 
 func (s *LLMService) chat(c *fiber.Ctx) error {
 	message := new(Message)
@@ -41,12 +46,16 @@ func (s *LLMService) chat(c *fiber.Ctx) error {
 		Content: message.Content,
 	})
 
+	weekday = time.Now().Weekday()
+	weekdayStr = weekday.String()
+	date = time.Now().Format("2006-01-02")
+
 	resp, err := s.llmClient.CreateChatCompletion(
 		context.Background(),
 		openai.ChatCompletionRequest{
 			Model:     os.Getenv("OPENAI_MODEL_ID"),
 			Messages:  chatMessage,
-			Functions: []openai.FunctionDefinition{getDateTime, getProductsList},
+			Functions: []openai.FunctionDefinition{getProductsAndDate},
 		},
 	)
 	if err != nil {
@@ -71,8 +80,8 @@ func (s *LLMService) chat(c *fiber.Ctx) error {
 	json.Unmarshal([]byte(incommingArguments), &arguments)
 
 	var product Products
-	result := s.db.Where("product = ? OR flavor = ? OR quantity = ?", arguments.Product, arguments.Flavor, arguments.Quantity).First(&product)
 
+	result := s.db.Where("product = ? OR flavor = ? OR quantity = ?", arguments.Product, arguments.Flavor, arguments.Quantity).First(&product)
 	if result.Error != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": result.Error,

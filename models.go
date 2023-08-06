@@ -1,7 +1,7 @@
 package main
 
 import (
-	openai "github.com/sashabaranov/go-openai"
+	"github.com/sashabaranov/go-openai"
 	"gorm.io/gorm"
 )
 
@@ -33,4 +33,6 @@ type Arguments struct {
 	Product  string `json:"product"`
 	Flavor   string `json:"flavor"`
 	Quantity int    `json:"quantity"`
+	Day      int    `json:"day"`
+	Time     string `json:"time"`
 }

@@ -19,3 +19,8 @@ The innital parts for the lean engine are:
 - AI LLM: go-openai package
 - Vector DB: milvus-sdk-go package (we will be using milvus for start, but later this layer can be abstracted to connect to any vector db or other storage technology)
 - IO: fiber package (the desired implementation is for whatsapp chatbots. But to remove the initial burden and make the engine as extensible as possible, we will be using HTTP requests to communicate to and from the system. In this scenario, the communication layer is stateless, but the lean engine is stateful)
+
+
+{
+	"content": "Hoje tá muito corrido. Queria marcar pra depois de amanhã pra pegar os 3 pods e o juice de morango"
+}
