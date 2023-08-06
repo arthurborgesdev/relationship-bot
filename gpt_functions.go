@@ -1,6 +1,8 @@
 package main
 
 import (
+	"time"
+
 	openai "github.com/sashabaranov/go-openai"
 	"github.com/sashabaranov/go-openai/jsonschema"
 )
@@ -33,9 +35,8 @@ var getProductsAndDate = openai.FunctionDefinition{
 			},
 			"date": {
 				Type: "string",
-				Description: `Hoje é ` + weekdayStr + ` or ` + date + `. Retorne a data no formato YYYY-MM-DD baseado no dia da semana informado.
-				Exemplo: Se hoje for Friday (sexta-feira) e 2023-08-04, então Sunday (domingo) será 2023-08-06. Retorne a data nesse formato: "YYYY-MM-DD"
-				Não peça horário, apenas faça o cálculo e informe no formato mencionado.`,
+				Description: `Hoje é ` + date + `. Então amanhã é ` + time.Now().AddDate(0, 0, 1).Format("2006-01-02") + `. Depois de amanhã é ` + time.Now().AddDate(0, 0, 2).Format("2006-01-02") + `. E assim por diante.
+				Se o usuário não informar data, retorne a data de hoje. Exemplo: "Vou querer um juice de morango e um vape". Resposta: "` + date + `"`,
 			},
 			"time": {
 				Type: "string",
@@ -43,6 +44,6 @@ var getProductsAndDate = openai.FunctionDefinition{
 				o usuário não infomar data, retorne "00:00". Exemplo: "Vou querer um juice de morango e um vape". Resposta: "00:00"`,
 			},
 		},
-		Required: []string{"product", "flavor", "quantity", "day", "weekday", "time"},
+		Required: []string{"product", "flavor", "quantity", "day", "date", "time"},
 	},
 }
