@@ -29,9 +29,17 @@ type LLMService struct {
 }
 
 type Arguments struct {
-	Date     string `json:"date"`
-	Product  string `json:"product"`
-	Flavor   string `json:"flavor"`
-	Quantity int    `json:"quantity"`
-	Time     string `json:"time"`
+	Date string `json:"date"`
+	/*
+		Product  string `json:"product"`
+		Flavor   string `json:"flavor"`
+		Quantity int    `json:"quantity"`
+	*/
+	Product struct {
+		Item     string `json:"item"`
+		Flavor   string `json:"flavor"`
+		Quantity int    `json:"quantity"`
+		Volume   int    `json:"volume"`
+	} `json:"product"`
+	Time string `json:"time"`
 }

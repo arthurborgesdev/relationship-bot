@@ -81,7 +81,7 @@ func (s *LLMService) chat(c *fiber.Ctx) error {
 
 	var product Products
 
-	result := s.db.Where("product = ? OR flavor = ? OR quantity = ?", arguments.Product, arguments.Flavor, arguments.Quantity).First(&product)
+	result := s.db.Where("product = ? OR flavor = ? OR quantity = ?", arguments.Product, arguments.Product.Flavor, arguments.Product.Quantity).First(&product)
 	if result.Error != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": result.Error,

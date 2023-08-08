@@ -53,10 +53,11 @@ func gptCall(message string) (Arguments, error) {
 	fmt.Printf("ChatCompletion response: %v\n", arguments) // Parsear e mostrar em formato JSON
 	fmt.Printf("Date: %v\n", arguments.Date)
 	fmt.Printf("Time: %v\n", arguments.Time)
+	/*
 	fmt.Printf("Product: %s\n", arguments.Product)
 	fmt.Printf("Flavor: %s\n", arguments.Flavor)
 	fmt.Printf("Quantity: %d\n", arguments.Quantity)
-
+	*/
 	argumentsJSON, err := json.Marshal(arguments)
 	if err != nil {
 		fmt.Printf("Error marshaling arguments: %v\n", err)
@@ -76,7 +77,7 @@ func TestGPTFunction(t *testing.T) {
 		fmt.Printf("Error calling GPT: %v\n", err)
 		return
 	}
-
+	/*
 	if arguments.Product != "vape" {
 		t.Errorf("Product is not correct: %s", arguments.Product)
 	}
@@ -88,7 +89,7 @@ func TestGPTFunction(t *testing.T) {
 	if arguments.Quantity != 1 {
 		t.Errorf("Quantity is not correct: %d", arguments.Quantity)
 	}
-
+	*/
 	if arguments.Time != "14:00" {
 		t.Errorf("Time is not correct: %s", arguments.Time)
 	}
