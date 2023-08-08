@@ -53,9 +53,9 @@ func gptCall(message string) (Arguments, error) {
 	fmt.Printf("ChatCompletion response: %v\n", arguments) // Parsear e mostrar em formato JSON
 	fmt.Printf("Date: %v\n", arguments.Date)
 	fmt.Printf("Time: %v\n", arguments.Time)
-	fmt.Printf("Product: %s\n", arguments.Product.Item)
-	fmt.Printf("Flavor: %s\n", arguments.Product.Flavor)
-	fmt.Printf("Quantity: %d\n", arguments.Product.Quantity)
+	fmt.Printf("Product: %s\n", arguments.Item.Product)
+	fmt.Printf("Flavor: %s\n", arguments.Item.Flavor)
+	fmt.Printf("Quantity: %d\n", arguments.Item.Quantity)
 
 	argumentsJSON, err := json.Marshal(arguments)
 	if err != nil {
@@ -78,16 +78,16 @@ func TestGPTFunction(t *testing.T) {
 		return
 	}
 
-	if arguments.Product.Item != "vape" {
-		t.Errorf("Product is not correct: %s", arguments.Product.Item)
+	if arguments.Item.Product != "vape" {
+		t.Errorf("Product is not correct: %s", arguments.Item.Product)
 	}
 
-	if arguments.Product.Flavor != "morango" {
-		t.Errorf("Flavor is not correct: %s", arguments.Product.Flavor)
+	if arguments.Item.Flavor != "morango" {
+		t.Errorf("Flavor is not correct: %s", arguments.Item.Flavor)
 	}
 
-	if arguments.Product.Quantity != 1 {
-		t.Errorf("Quantity is not correct: %d", arguments.Product.Quantity)
+	if arguments.Item.Quantity != 1 {
+		t.Errorf("Quantity is not correct: %d", arguments.Item.Quantity)
 	}
 
 	if arguments.Date != time.Now().Add(time.Hour*24).Format("2006-01-02") {
@@ -147,15 +147,15 @@ func TestGPTFunctionVolume(t *testing.T) {
 		return
 	}
 
-	if arguments.Product.Item != "juice" {
-		t.Errorf("Item is not correct: %s", arguments.Product.Item)
+	if arguments.Item.Product != "juice" {
+		t.Errorf("Item is not correct: %s", arguments.Item.Product)
 	}
 
-	if arguments.Product.Flavor != "morango" {
-		t.Errorf("Flavor is not correct: %s", arguments.Product.Flavor)
+	if arguments.Item.Flavor != "morango" {
+		t.Errorf("Flavor is not correct: %s", arguments.Item.Flavor)
 	}
 
-	if arguments.Product.Volume != "40" {
-		t.Errorf("Volume is not correct: %s", arguments.Product.Flavor)
+	if arguments.Item.Volume != "40" {
+		t.Errorf("Volume is not correct: %s", arguments.Item.Flavor)
 	}
 }
