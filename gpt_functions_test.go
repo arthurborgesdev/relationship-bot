@@ -53,11 +53,10 @@ func gptCall(message string) (Arguments, error) {
 	fmt.Printf("ChatCompletion response: %v\n", arguments) // Parsear e mostrar em formato JSON
 	fmt.Printf("Date: %v\n", arguments.Date)
 	fmt.Printf("Time: %v\n", arguments.Time)
-	/*
-	fmt.Printf("Product: %s\n", arguments.Product)
-	fmt.Printf("Flavor: %s\n", arguments.Flavor)
-	fmt.Printf("Quantity: %d\n", arguments.Quantity)
-	*/
+	fmt.Printf("Product: %s\n", arguments.Product.Item)
+	fmt.Printf("Flavor: %s\n", arguments.Product.Flavor)
+	fmt.Printf("Quantity: %d\n", arguments.Product.Quantity)
+
 	argumentsJSON, err := json.Marshal(arguments)
 	if err != nil {
 		fmt.Printf("Error marshaling arguments: %v\n", err)
@@ -71,36 +70,38 @@ func gptCall(message string) (Arguments, error) {
 
 func TestGPTFunction(t *testing.T) {
 	message := "Vou querer um juice de morango e um vape. Vou buscar aí amanhã as 14h00"
+	fmt.Printf("TestMessage: %s\n", message)
 
 	arguments, err := gptCall(message)
 	if err != nil {
 		fmt.Printf("Error calling GPT: %v\n", err)
 		return
 	}
-	/*
-	if arguments.Product != "vape" {
-		t.Errorf("Product is not correct: %s", arguments.Product)
+
+	if arguments.Product.Item != "vape" {
+		t.Errorf("Product is not correct: %s", arguments.Product.Item)
 	}
 
-	if arguments.Flavor != "morango" {
-		t.Errorf("Flavor is not correct: %s", arguments.Flavor)
+	if arguments.Product.Flavor != "morango" {
+		t.Errorf("Flavor is not correct: %s", arguments.Product.Flavor)
 	}
 
-	if arguments.Quantity != 1 {
-		t.Errorf("Quantity is not correct: %d", arguments.Quantity)
-	}
-	*/
-	if arguments.Time != "14:00" {
-		t.Errorf("Time is not correct: %s", arguments.Time)
+	if arguments.Product.Quantity != 1 {
+		t.Errorf("Quantity is not correct: %d", arguments.Product.Quantity)
 	}
 
 	if arguments.Date != time.Now().Add(time.Hour*24).Format("2006-01-02") {
 		t.Errorf("Date is not correct: %s", arguments.Date)
+	}
+
+	if arguments.Time != "14:00" {
+		t.Errorf("Time is not correct: %s", arguments.Time)
 	}
 }
 
 func TestGPTFunctionDates(t *testing.T) {
-	message := "Vou buscar aí amanhã as 14h00"
+	message := "Vou buscar aí amanhã às 13h10"
+	fmt.Printf("TestMessage: %s\n", message)
 
 	arguments, err := gptCall(message)
 	if err != nil {
@@ -111,10 +112,15 @@ func TestGPTFunctionDates(t *testing.T) {
 	if arguments.Date != time.Now().Add(time.Hour*24).Format("2006-01-02") {
 		t.Errorf("Date is not correct: %s", arguments.Date)
 	}
+
+	if arguments.Time != "13:10" {
+		t.Errorf("Time is not correct: %s", arguments.Time)
+	}
 }
 
 func TestGPTFunctionWeekdays(t *testing.T) {
-	message := "Amanhã não é um bom dia pra mim, mas vou buscar próxima segunda-feira as 14h00"
+	message := "Amanhã não é um bom dia pra mim, mas vou buscar próxima segunda-feira às 14h25"
+	fmt.Printf("TestMessage: %s\n", message)
 
 	arguments, err := gptCall(message)
 	if err != nil {
@@ -124,5 +130,32 @@ func TestGPTFunctionWeekdays(t *testing.T) {
 
 	if arguments.Date != time.Now().Add(time.Hour*24*6).Format("2006-01-02") {
 		t.Errorf("Date is not correct: %s", arguments.Date)
+	}
+
+	if arguments.Time != "14:25" {
+		t.Errorf("Time is not correct: %s", arguments.Time)
+	}
+}
+
+func TestGPTFunctionVolume(t *testing.T) {
+	message := "Vou querer um juice de morango de 40ml"
+	fmt.Printf("TestMessage: %s\n", message)
+
+	arguments, err := gptCall(message)
+	if err != nil {
+		fmt.Printf("Error calling GPT: %v\n", err)
+		return
+	}
+
+	if arguments.Product.Item != "juice" {
+		t.Errorf("Item is not correct: %s", arguments.Product.Item)
+	}
+
+	if arguments.Product.Flavor != "morango" {
+		t.Errorf("Flavor is not correct: %s", arguments.Product.Flavor)
+	}
+
+	if arguments.Product.Volume != "40" {
+		t.Errorf("Volume is not correct: %s", arguments.Product.Flavor)
 	}
 }

@@ -42,38 +42,15 @@ var getProductsAndDate = openai.FunctionDefinition{
 						Exemplo: "Vou querer um juice de morango". Resposta: "1"`,
 					},
 					"volume": {
-						Type: "integer",
-						Description: `O usuário informará a quantidade volumétrica dos juices 
-						e nicsalts (que variam de 15 a 100 ml) que ele quer comprar.
-						Ele pode informar volumes separados pela milimetragem ou não. Salve apenas os números. 
-						Exemplos: se informar "30ml" ou "60ml", salve apenas "30" ou "60".
-						Se o usuário não informar valor volumétrico, retorne 0. 
-						Se ele não informar nada relacionado ao volume do item, retorne valor 0.
-						Exemplo: "Vou querer um pod SWAG Kit de morango." Resposta: "0",
-						"Vou querer um pod SWAG Kit de morango. Resposta: "0"
-						"Vou querer um juice de morango". Resposta: "0"`,
+						Type: "string",
+						Description: `Retorne a quantidade de ml do produto em numeral.
+						"Exemplo: "Vou querer um juice de morango de 30ml". Resposta: "30".
+						"Retorne "0" se o usuário não informar o volume. Exemplo: "Vou querer um juice de morango". Resposta: "0"`,
 						Enum: []string{"0", "15", "30", "60", "100"},
 					},
 				},
 				Required: []string{"product", "flavor", "quantity", "volume"},
 			},
-			/*
-				"product": {
-					Type: "string",
-					Description: `O usuário informará a lista de vapes e pods que ele quer comprar. Ele pode informar a marca, o modelo,
-					a quantidade, o sabor e outros dados referentes a produtos de cigarros eletônicos. Exemplos: "Freebase", "Menta".`,
-				},
-				"flavor": {
-					Type: "string",
-					Description: `O usuário informará os sabores de juices que ele quer comprar. Aqui os sabores podem ser tanto de vapes quanto
-					de pods. Exemplo: "Freebase de morango", "Nicsalt de uva". Salve apenas os sabores separados por vírgula`,
-				},
-				"quantity": {
-					Type: "integer",
-					Description: `O usuário informará a quantidade de vapes e pods que ele quer comprar. Ele pode informar diferentes quantidades,
-					para cada item diferente. Exemplos: "2 Freebase de morango", "3 vapes de menta". Retorne apenas a quantidade separada por vírgula`,
-				},
-			*/
 			"date": {
 				Type: "string",
 				Description: `Hoje é ` + date + `. Então amanhã é ` + time.Now().AddDate(0, 0, 1).Format("2006-01-02") + `. Depois de amanhã é ` + time.Now().AddDate(0, 0, 2).Format("2006-01-02") + `. E assim por diante.
@@ -81,8 +58,12 @@ var getProductsAndDate = openai.FunctionDefinition{
 			},
 			"time": {
 				Type: "string",
-				Description: `Retorne a hora informada pelo usuário no formato hh:mm. Exemplo: "10:00", "14:30". Retorne a hora nesse formato: "hh:mm" Se
-				o usuário não infomar data, retorne "00:00". Exemplo: "Vou querer um juice de morango e um vape". Resposta: "00:00"`,
+				Description: `Retorne a hora informada pelo usuário no formato hh:mm.
+				Use ":" para separar hora de minutos.
+				Exemplo: "Vou buscar aí amanhã as 14h30", retorne: "14:30".
+				Exemplo: "Vou buscar aí amanhã as 13h10", retorne: "13:10". 
+				Retorne a hora nesse formato: "hh:mm" Se o usuário não infomar hora, retorne "". 
+				Exemplo: "Vou querer um juice de morango e um vape". Resposta: ""`,
 			},
 		},
 		Required: []string{"product", "date", "time"},

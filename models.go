@@ -39,7 +39,7 @@ type Arguments struct {
 		Item     string `json:"item"`
 		Flavor   string `json:"flavor"`
 		Quantity int    `json:"quantity"`
-		Volume   int    `json:"volume"`
+		Volume   string `json:"volume"`
 	} `json:"product"`
 	Time string `json:"time"`
 }
