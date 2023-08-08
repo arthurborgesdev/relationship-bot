@@ -29,10 +29,6 @@ var getProductsAndDate = openai.FunctionDefinition{
 				Description: `O usuário informará a quantidade de vapes e pods que ele quer comprar. Ele pode informar diferentes quantidades,
 				para cada item diferente. Exemplos: "2 Freebase de morango", "3 vapes de menta". Retorne apenas a quantidade separada por vírgula`,
 			},
-			"day": {
-				Type:        "integer",
-				Description: `Hoje é corresponde a 0, amanhã a 1, depois de amanhã a 2. E assim por diante.`,
-			},
 			"date": {
 				Type: "string",
 				Description: `Hoje é ` + date + `. Então amanhã é ` + time.Now().AddDate(0, 0, 1).Format("2006-01-02") + `. Depois de amanhã é ` + time.Now().AddDate(0, 0, 2).Format("2006-01-02") + `. E assim por diante.
@@ -44,6 +40,6 @@ var getProductsAndDate = openai.FunctionDefinition{
 				o usuário não infomar data, retorne "00:00". Exemplo: "Vou querer um juice de morango e um vape". Resposta: "00:00"`,
 			},
 		},
-		Required: []string{"product", "flavor", "quantity", "day", "date", "time"},
+		Required: []string{"product", "flavor", "quantity", "date", "time"},
 	},
 }

@@ -33,6 +33,5 @@ type Arguments struct {
 	Product  string `json:"product"`
 	Flavor   string `json:"flavor"`
 	Quantity int    `json:"quantity"`
-	Day      int    `json:"day"`
 	Time     string `json:"time"`
 }

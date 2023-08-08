@@ -52,7 +52,6 @@ func gptCall(message string) (Arguments, error) {
 
 	fmt.Printf("ChatCompletion response: %v\n", arguments) // Parsear e mostrar em formato JSON
 	fmt.Printf("Date: %v\n", arguments.Date)
-	fmt.Printf("Day: %v\n", arguments.Day)
 	fmt.Printf("Time: %v\n", arguments.Time)
 	fmt.Printf("Product: %s\n", arguments.Product)
 	fmt.Printf("Flavor: %s\n", arguments.Flavor)
@@ -90,12 +89,12 @@ func TestGPTFunction(t *testing.T) {
 		t.Errorf("Quantity is not correct: %d", arguments.Quantity)
 	}
 
-	if arguments.Day != 1 {
-		t.Errorf("Day is not correct: %d", arguments.Day)
-	}
-
 	if arguments.Time != "14:00" {
 		t.Errorf("Time is not correct: %s", arguments.Time)
+	}
+
+	if arguments.Date != time.Now().Add(time.Hour*24).Format("2006-01-02") {
+		t.Errorf("Date is not correct: %s", arguments.Date)
 	}
 }
 
@@ -108,7 +107,21 @@ func TestGPTFunctionDates(t *testing.T) {
 		return
 	}
 
-	if arguments.Date != "2023-08-07" {
+	if arguments.Date != time.Now().Add(time.Hour*24).Format("2006-01-02") {
+		t.Errorf("Date is not correct: %s", arguments.Date)
+	}
+}
+
+func TestGPTFunctionWeekdays(t *testing.T) {
+	message := "Amanhã não é um bom dia pra mim, mas vou buscar próxima segunda-feira as 14h00"
+
+	arguments, err := gptCall(message)
+	if err != nil {
+		fmt.Printf("Error calling GPT: %v\n", err)
+		return
+	}
+
+	if arguments.Date != time.Now().Add(time.Hour*24*6).Format("2006-01-02") {
 		t.Errorf("Date is not correct: %s", arguments.Date)
 	}
 }
