@@ -13,7 +13,7 @@ var getProductsAndDate = openai.FunctionDefinition{
 	Parameters: jsonschema.Definition{
 		Type: "object",
 		Properties: map[string]jsonschema.Definition{
-			"list": {
+			"products": {
 				Type: "array",
 				Description: `O usuário informará os vapes, pods, coils e juices que ele quer comprar.
 				Ele pode informar a marca ou modelo destes.
@@ -25,7 +25,7 @@ var getProductsAndDate = openai.FunctionDefinition{
 				Items: &jsonschema.Definition{
 					Type: "object",
 					Properties: map[string]jsonschema.Definition{
-						"product": {
+						"item": {
 							Type: "string",
 							Description: `O usuário informará os vapes, pods, coils e juices que ele quer comprar. 
 							Ele pode informar a marca ou modelo destes. 

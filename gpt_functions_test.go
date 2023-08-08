@@ -50,12 +50,17 @@ func gptCall(message string) (Arguments, error) {
 
 	json.Unmarshal([]byte(incommingArguments), &arguments)
 
-	fmt.Printf("ChatCompletion response: %v\n", arguments) // Parsear e mostrar em formato JSON
+	fmt.Printf("ChatCompletion response: %v\n", arguments)
 	fmt.Printf("Date: %v\n", arguments.Date)
 	fmt.Printf("Time: %v\n", arguments.Time)
-	fmt.Printf("Product: %s\n", arguments.Item.Product)
-	fmt.Printf("Flavor: %s\n", arguments.Item.Flavor)
-	fmt.Printf("Quantity: %d\n", arguments.Item.Quantity)
+
+	for i, product := range arguments.Products {
+		fmt.Printf("Product %d:\n", i+1)
+		fmt.Printf("\tItem: %s\n", product.Item)
+		fmt.Printf("\tFlavor: %s\n", product.Flavor)
+		fmt.Printf("\tQuantity: %d\n", product.Quantity)
+		fmt.Printf("\tVolume: %s\n", product.Volume)
+	}
 
 	argumentsJSON, err := json.Marshal(arguments)
 	if err != nil {
@@ -78,16 +83,28 @@ func TestGPTFunction(t *testing.T) {
 		return
 	}
 
-	if arguments.Item.Product != "vape" {
-		t.Errorf("Product is not correct: %s", arguments.Item.Product)
+	foundVape := false
+	foundJuice := false
+	for _, product := range arguments.Products {
+		if product.Item == "vape" {
+			foundVape = true
+			if product.Quantity != 1 {
+				t.Errorf("Quantity is not correct for vape: %d", product.Quantity)
+			}
+		}
+		if product.Item == "juice" {
+			foundJuice = true
+			if product.Flavor != "morango" {
+				t.Errorf("Flavor is not correct for juice: %s", product.Flavor)
+			}
+		}
 	}
 
-	if arguments.Item.Flavor != "morango" {
-		t.Errorf("Flavor is not correct: %s", arguments.Item.Flavor)
+	if !foundVape {
+		t.Errorf("Vape product not found")
 	}
-
-	if arguments.Item.Quantity != 1 {
-		t.Errorf("Quantity is not correct: %d", arguments.Item.Quantity)
+	if !foundJuice {
+		t.Errorf("Juice product not found")
 	}
 
 	if arguments.Date != time.Now().Add(time.Hour*24).Format("2006-01-02") {
@@ -98,7 +115,6 @@ func TestGPTFunction(t *testing.T) {
 		t.Errorf("Time is not correct: %s", arguments.Time)
 	}
 }
-
 func TestGPTFunctionDates(t *testing.T) {
 	message := "Vou buscar aí amanhã às 13h10"
 	fmt.Printf("TestMessage: %s\n", message)
@@ -147,15 +163,17 @@ func TestGPTFunctionVolume(t *testing.T) {
 		return
 	}
 
-	if arguments.Item.Product != "juice" {
-		t.Errorf("Item is not correct: %s", arguments.Item.Product)
+	product := arguments.Products[0]
+
+	if product.Item != "juice" {
+		t.Errorf("Item is not correct: %s", product.Item)
 	}
 
-	if arguments.Item.Flavor != "morango" {
-		t.Errorf("Flavor is not correct: %s", arguments.Item.Flavor)
+	if product.Flavor != "morango" {
+		t.Errorf("Flavor is not correct: %s", product.Flavor)
 	}
 
-	if arguments.Item.Volume != "40" {
-		t.Errorf("Volume is not correct: %s", arguments.Item.Flavor)
+	if product.Volume != "40" {
+		t.Errorf("Volume is not correct: %s", product.Volume)
 	}
 }
